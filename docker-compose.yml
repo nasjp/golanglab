@@ -1,0 +1,16 @@
+version: "3"
+
+services:
+  base: &base
+    image: golang:1.14-alpine3.11
+    volumes:
+      - ./:/golanglab:cached
+
+  queueworker: &queueworker
+    <<: *base
+    working_dir: /golanglab/queueworker
+    command: >
+      sh -c '
+        go build -o bin
+        ./bin
+      '

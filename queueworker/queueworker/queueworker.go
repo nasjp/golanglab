@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -30,12 +31,9 @@ func New(dispatcherN int, workerN int, workerFunc workerFunc) *QueueWorker {
 
 func (qw *QueueWorker) Run() {
 	ctx, cancel := context.WithCancel(context.Background())
-	ch := make(chan os.Signal, 1)
-	defer signal.Notify(ch, syscall.SIGTERM, syscall.SIGKILL)
+
 	go func() {
-		s := <-ch
-		log.Printf("Caught signal: %s", s)
-		close(ch)
+		<-qw.listenCancelSignal(ctx)
 		cancel()
 	}()
 
@@ -44,20 +42,64 @@ func (qw *QueueWorker) Run() {
 		dispatcherChs = append(dispatcherChs, qw.dispatch(ctx))
 	}
 
-	workerCh := qw.fanIn(ctx, dispatcherChs...)
+	workerCh := qw.fanIn(ctx, dispatcherChs)
 	for i := 0; i < qw.workerN; i++ {
 		qw.work(ctx, workerCh)
 	}
-}
 
-func (qw *QueueWorker) Wait() {
 	qw.wg.Wait()
+	log.Printf("Left behind goroutines: %d", runtime.NumGoroutine())
 }
 
-func (qw *QueueWorker) fanIn(ctx context.Context, chs ...<-chan interface{}) <-chan interface{} {
+func (qw *QueueWorker) listenCancelSignal(ctx context.Context) <-chan os.Signal {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGTERM, syscall.SIGKILL)
+	return ch
+}
+
+func (qw *QueueWorker) dispatch(ctx context.Context) <-chan interface{} {
+	ch := make(chan interface{})
+
+	qw.wg.Add(1)
+	go func() {
+		defer func() {
+			close(ch)
+			qw.wg.Done()
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			// 便宜的に 3秒ごとにメッセージを受け取る
+			// SQSと連携する想定
+			// output, err := sqs.ReceiveMessage(input)
+			// msgs := output.Messages
+			time.Sleep(time.Second * 3)
+			msgs := []int{1, 2, 3, 4, 5}
+			if len(msgs) == 0 {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+			for _, m := range msgs {
+				ch <- m
+			}
+		}
+	}()
+
+	return ch
+}
+
+func (qw *QueueWorker) fanIn(ctx context.Context, chs []<-chan interface{}) <-chan interface{} {
 	multiplexedCh := make(chan interface{})
 
-	multiplex := func(ch <-chan interface{}) {
+	multiplex := func(ch <-chan interface{}, ctx context.Context) {
 		defer qw.wg.Done()
 
 		for i := range ch {
@@ -71,7 +113,7 @@ func (qw *QueueWorker) fanIn(ctx context.Context, chs ...<-chan interface{}) <-c
 
 	qw.wg.Add(len(chs))
 	for _, ch := range chs {
-		go multiplex(ch)
+		go multiplex(ch, ctx)
 	}
 
 	go func() {
@@ -82,53 +124,11 @@ func (qw *QueueWorker) fanIn(ctx context.Context, chs ...<-chan interface{}) <-c
 	return multiplexedCh
 }
 
-func (qw *QueueWorker) dispatch(ctx context.Context) <-chan interface{} {
-	ch := make(chan interface{})
-
-	qw.wg.Add(1)
-	go func() {
-		defer qw.wg.Done()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				// 便宜的に 3秒ごとにメッセージを受け取る
-				// SQSと連携する想定
-				// output, err := sqs.ReceiveMessage(input)
-				// msgs := output.Messages
-				time.Sleep(time.Second * 3)
-				msgs := []int{1, 2, 3, 4, 5}
-				if len(msgs) == 0 {
-					break
-				}
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					for _, m := range msgs {
-						ch <- m
-					}
-				}
-			}
-		}
-	}()
-
-	go func() {
-		<-ctx.Done()
-		close(ch)
-	}()
-
-	return ch
-}
-
 func (qw *QueueWorker) work(ctx context.Context, ch <-chan interface{}) {
 	qw.wg.Add(1)
 	go func() {
+		defer qw.wg.Done()
 		defer func() {
-			qw.wg.Done()
-
 			if err := recover(); err != nil {
 				log.Printf("Recover: %v", err)
 				select {

@@ -13,5 +13,4 @@ const (
 func main() {
 	qw := queueworker.New(dispatcherN, workerN, services.SampleHandler)
 	qw.Run()
-	qw.Wait()
 }

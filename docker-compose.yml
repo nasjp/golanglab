@@ -14,3 +14,14 @@ services:
         go build -o bin
         ./bin
       '
+  api: &api
+    <<: *base
+    working_dir: /golanglab/api
+    ports:
+      - "8080:8080"
+    command: >
+      sh -c '
+        go build -o bin
+        ./bin
+      '
+

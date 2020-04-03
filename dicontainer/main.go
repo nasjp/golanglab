@@ -4,41 +4,49 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	"github.com/nasjp/golanglab/dicontainer/services"
+	"go.uber.org/dig"
 )
 
+/*
+$ curl localhost:8080/upper --header 'Content-Type: application/json' -i --data-raw '{"name": "hoge"}'
+*/
+
 func main() {
-	if err := run(); err != nil {
+	if err := di(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	os.Exit(0)
 }
 
-func run() error {
-	http.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) { fmt.Println("hello world") })
+func normal() error {
+	p := services.NewUpperPresenter()
+	u := services.NewUpperUsecase(p)
+	h := services.NewUpperHandler(u)
+	http.HandleFunc("/upper", h.Handle)
 	http.ListenAndServe(":8080", nil)
 	return nil
 }
 
-type HelloHandler struct {
-	HelloUsecase HelloUsecaseInterface
-}
-
-func (h HelloHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	b := make([]byte, r.ContentLength)
-	if _, err := r.Body.Read(b); err != nil {
-		fmt.Fprintln(w, err)
-		return
+func di() error {
+	c := dig.New()
+	if err := c.Provide(services.NewUpperPresenter); err != nil {
+		return err
 	}
-	h.HelloUsecase.Do()
-}
-
-type HelloUsecaseInterface interface {
-	Do()
-}
-
-type HelloUsecase struct{}
-
-func (u *HelloUsecase) Do() {
-	fmt.Println("hello")
+	if err := c.Provide(services.NewUpperUsecase); err != nil {
+		return err
+	}
+	if err := c.Provide(services.NewUpperHandler); err != nil {
+		return err
+	}
+	err := c.Invoke(func(h *services.UpperHandler) {
+		http.HandleFunc("/upper", h.Handle)
+		http.ListenAndServe(":8080", nil)
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

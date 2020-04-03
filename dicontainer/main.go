@@ -14,7 +14,7 @@ $ curl localhost:8080/upper --header 'Content-Type: application/json' -i --data-
 */
 
 func main() {
-	if err := di(); err != nil {
+	if err := diContainer(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -30,7 +30,7 @@ func normal() error {
 	return nil
 }
 
-func di() error {
+func diContainer() error {
 	c := dig.New()
 	if err := c.Provide(services.NewUpperPresenter); err != nil {
 		return err

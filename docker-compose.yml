@@ -6,7 +6,7 @@ services:
     volumes:
       - ./:/golanglab:cached
 
-  queueworker: &queueworker
+  queueworker:
     <<: *base
     working_dir: /golanglab/queueworker
     command: >
@@ -14,9 +14,21 @@ services:
         go build -o bin
         ./bin
       '
-  api: &api
+  api:
     <<: *base
     working_dir: /golanglab/api
+    ports:
+      - "8080:8080"
+    command: >
+      sh -c '
+        go build -o bin
+        ./bin
+      '
+
+
+  dicontainer:
+    <<: *base
+    working_dir: /golanglab/dicontainer
     ports:
       - "8080:8080"
     command: >

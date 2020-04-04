@@ -1,0 +1,27 @@
+version: "3"
+
+services:
+  app:
+    image: golang:1.14-alpine3.11
+    working_dir: /sqlboiler
+    volumes:
+      - ./:/sqlboiler:cached
+    depends_on:
+      - db
+    command: >
+      sh -c '
+        go get -u -t github.com/volatiletech/sqlboiler
+        go get github.com/volatiletech/sqlboiler/drivers/sqlboiler-mysql
+        sqlboiler --no-context -o datamodels -p datamodels --wipe mysql
+        go run main.go
+      '
+
+  db:
+    image: mysql:5.7.25
+    command: mysqld --sql_mode="ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+    ports:
+      - "5306:3306"
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d

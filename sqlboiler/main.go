@@ -62,6 +62,12 @@ func run() error {
 		fmt.Println(u.ID, u.Name)
 	}
 
+	us, err = datamodels.Users(qm.SQL("select * from users")).All(db)
+
+	for _, u := range us {
+		fmt.Println(u.ID, u.Name)
+	}
+
 	us, err = datamodels.Users(qm.Where("ID = ?", 1)).All(db)
 
 	for _, u := range us {

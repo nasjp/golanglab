@@ -4,12 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/nasjp/golanglab/sqlboiler/datamodels"
 	"github.com/volatiletech/sqlboiler/boil"
-	"github.com/volatiletech/sqlboiler/queries/qm"
 )
 
 const connectionTemplate = "%s:%s@(%s:%s)/%s?parseTime=true&tls=%t&multiStatements=true"
@@ -59,35 +57,16 @@ func run() error {
 	}
 
 	for _, u := range us {
-		fmt.Println(u.ID, u.Name)
+		u.Exist = true
+		if _, err := u.Update(db, boil.Infer()); err != nil {
+			return err
+		}
 	}
-
-	us, err = datamodels.Users(qm.SQL("select * from users")).All(db)
-
-	for _, u := range us {
-		fmt.Println(u.ID, u.Name)
+	var exist bool
+	r := db.QueryRow(`select exist from users where id = 1`)
+	if err := r.Scan(&exist); err != nil {
+		return err
 	}
-
-	us, err = datamodels.Users(qm.Where("ID = ?", 1)).All(db)
-
-	for _, u := range us {
-		fmt.Println(u.ID, u.Name)
-	}
-
-	us, err = datamodels.Users(qm.Limit(3)).All(db)
-
-	for _, u := range us {
-		fmt.Println(u.ID, u.Name)
-	}
-
-	us, err = datamodels.Users(qm.Where("deleted_at = ?", time.Time{})).All(db)
-
-	for _, u := range us {
-		fmt.Println(u.ID, u.Name)
-	}
-
-	// if _, err := datamodels.Users().DeleteAll(db); err != nil {
-	// 	return err
-	// }
+	fmt.Println(exist)
 	return nil
 }

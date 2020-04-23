@@ -6,6 +6,7 @@ CREATE TABLE `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `company_id` int(11) NOT NULL,
   `name` varchar(255) COLLATE utf8mb4_bin NOT NULL,
+  `exist` tinyint(1) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `deleted_at` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',

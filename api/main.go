@@ -17,3 +17,11 @@ func HelloHandler(c echo.Context) error {
 	fmt.Println("=>", c.Request().Host, "<=")
 	return c.NoContent(http.StatusOK)
 }
+
+type User struct {
+	Name string
+}
+
+func (u *User) Do() int {
+	return 1
+}
